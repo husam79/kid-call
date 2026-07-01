@@ -53,5 +53,40 @@ export async function getAllKids(req, res, next) {
 }
 
 export async function callKid(req, res, next) {
-    
+    const user_id = req.body.user_id ?? req.user.id;
+    const kid_id = req.params.id;
+
+    const client = await createSupabaseClient();
+
+    // First we need to check if the kid exists
+    const { data: kidData, error: kidError } = await client.from("kids").select("*").eq("id", kid_id).single();
+
+    if(kidError){
+        throw new AppError("Could not find the kid", 404, kidError);
+    }
+    // And he has to be confirmed too
+    if(!kidData.is_confirmed){
+        throw new AppError("The kid is not confirmed", 400, error);
+    }
+    // Then add the call to the public.calls & public.call_logs
+    const {error: errorCall} = await client.from('calls').insert({
+        user_id,
+        kid_id
+    });
+
+    const {error: errorLogs} = await client.from('call_logs').insert({
+        user_id,
+        kid_id
+    });
+
+     if(errorCall){
+        throw new AppError("Could not call the kid", 500, error);
+    }
+
+    if(errorLogs){
+        throw new AppError("Could not log the call", 500, errorLogs);
+    }
+
+    return res.sendStatus(200);
+
 }
